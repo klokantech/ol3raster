@@ -2,6 +2,8 @@ goog.provide('ol.reproj');
 
 goog.require('ol.ImageReprojected');
 goog.require('ol.ImageState');
+goog.require('ol.ReprojectedTile');
+goog.require('ol.TileState');
 goog.require('ol.dom');
 goog.require('ol.math');
 goog.require('ol.proj');
@@ -63,11 +65,11 @@ ol.reproj.createImage = function(sourceProj, targetProj,
     }
 
     // render the reprojected content
-    ol.reproj.renderTriangles_(dstContext, targetResolution, triangles, [{
-      extent: srcImage.getExtent(),
-      resolution: srcImage.getResolution(),
-      image: srcImage.getImage()
-    }]);
+    ol.reproj.renderTriangles_(dstContext, srcImage.getResolution(),
+                               targetResolution, triangles, [{
+          extent: srcImage.getExtent(),
+          image: srcImage.getImage()
+        }]);
 
     dstImage.setImage(dstContext.canvas);
   };
@@ -84,6 +86,141 @@ ol.reproj.createImage = function(sourceProj, targetProj,
     });
     srcImage.load();
   }
+  return dstImage;
+};
+
+
+/**
+ * @param {ol.proj.Projection} sourceProj
+ * @param {ol.tilegrid.TileGrid} sourceTileGrid
+ * @param {ol.proj.Projection} targetProj
+ * @param {ol.tilegrid.TileGrid} targetTileGrid
+ * @param {number} z
+ * @param {number} x
+ * @param {number} y
+ * @param {number} pixelRatio
+ * @param {function(number, number, number, number) : ol.Tile} getTileFunction
+ * @return {ol.Tile}
+ * @api
+ */
+ol.reproj.createTile = function(sourceProj, sourceTileGrid,
+    targetProj, targetTileGrid, z, x, y, pixelRatio, getTileFunction) {
+
+  var tileCoord = [z, x, y];
+  var targetExtent = targetTileGrid.getTileCoordExtent(tileCoord);
+  var targetResolution = targetTileGrid.getResolution(z);
+
+  var transformInv = ol.proj.getTransform(targetProj, sourceProj);
+  var triangles = ol.reproj.triangulateExtent_(targetExtent, transformInv);
+
+  var idealSourceResolution =
+      targetProj.getPointResolution(targetResolution,
+                                    ol.extent.getCenter(targetExtent)) *
+      targetProj.getMetersPerUnit() / sourceProj.getMetersPerUnit();
+
+  var srcZ = sourceTileGrid.getZForResolution(idealSourceResolution);
+  var srcResolution = sourceTileGrid.getResolution(srcZ);
+  var srcExtent = ol.reproj.calcSourceExtent_(triangles);
+
+  if (!ol.extent.intersects(sourceTileGrid.getExtent(), srcExtent)) {
+    return new ol.ReprojectedTile(tileCoord, ol.TileState.EMPTY);
+  }
+
+  var srcRange = sourceTileGrid.getTileRangeForExtentAndZ(srcExtent, srcZ);
+
+
+  var srcFullRange = sourceTileGrid.getFullTileRange(srcZ);
+  srcRange.minX = Math.max(srcRange.minX, srcFullRange.minX);
+  srcRange.maxX = Math.min(srcRange.maxX, srcFullRange.maxX);
+  srcRange.minY = Math.max(srcRange.minY, srcFullRange.minY);
+  srcRange.maxY = Math.min(srcRange.maxY, srcFullRange.maxY);
+
+  var srcTiles = [];
+  for (var srcX = srcRange.minX; srcX <= srcRange.maxX; srcX++) {
+    for (var srcY = srcRange.minY; srcY <= srcRange.maxY; srcY++) {
+      var tile = getTileFunction(srcZ, srcX, srcY, pixelRatio);
+      //window['console']['log']('Have tile', tile, 'from', srcZ, srcX, srcY);
+      if (tile) {
+        srcTiles.push(tile);
+      }
+    }
+  }
+  //window['console']['log'](srcTiles.length, srcRange, srcExtent);
+
+  if (srcTiles.length === 0) {
+    return new ol.ReprojectedTile(tileCoord, ol.TileState.EMPTY);
+  }
+
+  // TODO: attributions merging
+  var dstImage = new ol.ReprojectedTile(tileCoord, ol.TileState.LOADING);
+
+  var reproject = function() {
+    var sources = [];
+    goog.array.forEach(srcTiles, function(tile, i, arr) {
+      if (tile && tile.getState() == ol.TileState.LOADED) {
+        sources.push({
+          extent: sourceTileGrid.getTileCoordExtent(tile.tileCoord),
+          image: tile.getImage()
+        });
+      } else {
+        //window['console']['log'](tile && tile.getState(), tile);
+      }
+    });
+
+    // create the canvas
+    var size = targetTileGrid.getTileSize(z);
+
+    var dstWidth = goog.isNumber(size) ? size : size[0];
+    var dstHeight = goog.isNumber(size) ? size : size[1];
+    var dstContext = ol.dom.createCanvasContext2D(dstWidth, dstHeight);
+
+    if (goog.DEBUG) {
+      dstContext.fillStyle =
+          sources.length === 0 ? 'rgba(255,0,0,.8)' :
+          (sources.length == 1 ? 'rgba(0,255,0,.3)' : 'rgba(0,0,255,.1)');
+      dstContext.fillRect(0, 0, dstWidth, dstHeight);
+    }
+
+    if (sources.length > 0) {
+      ol.reproj.renderTriangles_(dstContext, srcResolution, targetResolution,
+                                 triangles, sources);
+    }
+
+    dstImage.setImage(dstContext.canvas);
+  };
+
+  var leftToLoad = 0;
+  var onTileLoaded = function() {
+    leftToLoad--;
+    if (leftToLoad <= 0) {
+      reproject();
+    }
+  };
+
+  goog.array.forEach(srcTiles, function(tile, i, arr) {
+    var state = tile.getState();
+    if (state == ol.TileState.IDLE || state == ol.TileState.LOADING) {
+      leftToLoad++;
+      var listenKey;
+      listenKey = tile.listen(goog.events.EventType.CHANGE, function(e) {
+        var state = tile.getState();
+        if (state == ol.TileState.LOADED ||
+            state == ol.TileState.ERROR ||
+            state == ol.TileState.EMPTY) {
+          onTileLoaded();
+          goog.events.unlistenByKey(listenKey);
+        }
+      });
+      if (state == ol.TileState.IDLE) {
+        tile.load();
+      }
+    }
+  });
+
+  if (leftToLoad === 0) {
+    reproject();
+  }
+
   return dstImage;
 };
 
@@ -108,8 +245,8 @@ ol.reproj.triangulateExtent_ = function(extent, transformInv) {
   var brSrc = transformInv(brDst);
 
   var triangles = [
-    [[tlSrc, tlDst], [trSrc, trDst], [blSrc, blDst]],
-    [[blSrc, blDst], [trSrc, trDst], [brSrc, brDst]]
+    [[tlSrc, tlDst], [brSrc, brDst], [blSrc, blDst]],
+    [[tlSrc, tlDst], [trSrc, trDst], [brSrc, brDst]]
   ];
 
   return triangles;
@@ -136,16 +273,16 @@ ol.reproj.calcSourceExtent_ = function(triangles) {
 
 /**
  * Renders the source into the canvas based on the triangles.
- * @param {Canvas2DRenderingContext} context
+ * @param {CanvasRenderingContext2D} context
+ * @param {number} sourceResolution
  * @param {number} targetResolution
  * @param {ol.reproj.Triangles_} triangles
  * @param {Array.<{extent: ol.Extent,
- *                 resolution: number,
- *                 image: HTMLCanvasElement|Image|HTMLVideoElement}>} sources
+ *                 image: (HTMLCanvasElement|Image)}>} sources
  * @private
  */
-ol.reproj.renderTriangles_ = function(context, targetResolution,
-                                      triangles, sources) {
+ol.reproj.renderTriangles_ = function(context,
+    sourceResolution, targetResolution, triangles, sources) {
   goog.array.forEach(triangles, function(triangle, i, arr) {
     context.save();
 
@@ -185,7 +322,7 @@ ol.reproj.renderTriangles_ = function(context, targetResolution,
     context.scale(1, -1);
 
     context.scale(1 / targetResolution, 1 / targetResolution);
-    context.translate(-triangle[0][1][0], -triangle[1][1][1]);
+    context.translate(-u0, -v0);
     context.transform(coefs[0], coefs[3], coefs[1],
                       coefs[4], coefs[2], coefs[5]);
 
@@ -203,11 +340,13 @@ ol.reproj.renderTriangles_ = function(context, targetResolution,
     context.clip();
 
     goog.array.forEach(sources, function(src, i, arr) {
+      context.save();
       var tlSrcFromData = ol.extent.getTopLeft(src.extent);
       context.translate(tlSrcFromData[0], tlSrcFromData[1]);
-      context.scale(src.resolution, -src.resolution);
+      context.scale(sourceResolution, -sourceResolution);
 
       context.drawImage(src.image, 0, 0);
+      context.restore();
     });
 
     context.restore();
