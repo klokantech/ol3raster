@@ -10,12 +10,13 @@ goog.require('ol.math');
  * @param {CanvasRenderingContext2D} context
  * @param {number} sourceResolution
  * @param {number} targetResolution
+ * @param {ol.Extent} targetExtent
  * @param {ol.reproj.Triangulation} triangulation
  * @param {Array.<{extent: ol.Extent,
  *                 image: (HTMLCanvasElement|Image)}>} sources
  */
 ol.reproj.renderTriangles = function(context,
-    sourceResolution, targetResolution, triangulation, sources) {
+    sourceResolution, targetResolution, targetExtent, triangulation, sources) {
   goog.array.forEach(triangulation, function(triangle, i, arr) {
     context.save();
 
@@ -55,7 +56,8 @@ ol.reproj.renderTriangles = function(context,
     context.scale(1, -1);
 
     context.scale(1 / targetResolution, 1 / targetResolution);
-    context.translate(-u0, -v0);
+    var targetTopLeft = ol.extent.getTopLeft(targetExtent);
+    context.translate(-targetTopLeft[0], -targetTopLeft[1]);
     context.transform(coefs[0], coefs[3], coefs[1],
                       coefs[4], coefs[2], coefs[5]);
 

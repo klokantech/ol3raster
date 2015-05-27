@@ -62,6 +62,12 @@ ol.reproj.Image = function(sourceProj, targetProj,
    */
   this.targetResolution_ = targetResolution;
 
+  /**
+   * @private
+   * @type {!ol.Extent}
+   */
+  this.targetExtent_ = targetExtent;
+
   var srcExtent = ol.reproj.triangulation.getSourceExtent(this.triangles_);
 
   var idealSourceResolution =
@@ -124,7 +130,8 @@ ol.reproj.Image.prototype.reproject_ = function() {
   if (srcState == ol.ImageState.LOADED) {
     // render the reprojected content
     ol.reproj.renderTriangles(this.context_, this.srcImage_.getResolution(),
-                              this.targetResolution_, this.triangles_, [{
+                              this.targetResolution_, this.targetExtent_,
+                              this.triangles_, [{
           extent: this.srcImage_.getExtent(),
           image: this.srcImage_.getImage()
         }]);

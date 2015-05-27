@@ -168,7 +168,8 @@ ol.reproj.Tile.prototype.reproject_ = function() {
   }, this);
 
   // create the canvas
-  var z = this.getTileCoord()[0];
+  var tileCoord = this.getTileCoord();
+  var z = tileCoord[0];
   var size = this.targetTileGrid_.getTileSize(z);
   var targetResolution = this.targetTileGrid_.getResolution(z);
   var srcResolution = this.sourceTileGrid_.getResolution(this.srcZ_);
@@ -185,8 +186,9 @@ ol.reproj.Tile.prototype.reproject_ = function() {
   }
 
   if (sources.length > 0) {
+    var targetExtent = this.targetTileGrid_.getTileCoordExtent(tileCoord);
     ol.reproj.renderTriangles(context, srcResolution, targetResolution,
-                              this.triangles_, sources);
+                              targetExtent, this.triangles_, sources);
   }
 
   this.canvas_ = context.canvas;
