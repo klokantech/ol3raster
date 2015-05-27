@@ -65,12 +65,28 @@ ol.reproj.renderTriangles = function(context,
     //context.scale(1 / targetResolution, 1 / targetResolution);
     //context.scale(1 / 2, 1 / 2);
 
-    context.save();
+    var pixelSize = sourceResolution;
+    var centroid = [(x0 + x1 + x2) / 3, (y0 + y1 + y2) / 3];
+
+    // moves the `point` farther away from the `anchor`
+    var increasePointDistance = function(point, anchor, increment) {
+      var dir = [point[0] - anchor[0], point[1] - anchor[1]];
+      var distance = Math.sqrt(dir[0] * dir[0] + dir[1] * dir[1]);
+      var scaleFactor = (distance + increment) / distance;
+      return [anchor[0] + scaleFactor * dir[0],
+              anchor[1] + scaleFactor * dir[1]];
+    };
+
+    // enlarge the triangle so that the clip paths of individual triangles
+    //   slightly (1px) overlap to prevent transparency errors on triangle edges
+    var p0 = increasePointDistance([x0, y0], centroid, pixelSize);
+    var p1 = increasePointDistance([x1, y1], centroid, pixelSize);
+    var p2 = increasePointDistance([x2, y2], centroid, pixelSize);
 
     context.beginPath();
-    context.moveTo(x0, y0);
-    context.lineTo(x1, y1);
-    context.lineTo(x2, y2);
+    context.moveTo(p0[0], p0[1]);
+    context.lineTo(p1[0], p1[1]);
+    context.lineTo(p2[0], p2[1]);
     context.closePath();
     context.clip();
 
@@ -80,15 +96,17 @@ ol.reproj.renderTriangles = function(context,
       context.translate(tlSrcFromData[0], tlSrcFromData[1]);
       context.scale(sourceResolution, -sourceResolution);
 
-      context.drawImage(src.image, 0, 0);
+      // the image has to be scaled by half a pixel in every direction
+      //    in order to prevent artifacts between the original tiles
+      //    that are introduced by the canvas antialiasing.
+      context.drawImage(src.image, -0.5, -0.5,
+                        src.image.width + 1, src.image.height + 1);
       context.restore();
     });
 
-    context.restore();
-
     if (goog.DEBUG) {
       context.strokeStyle = 'black';
-      context.lineWidth = 4000;
+      context.lineWidth = 2 * pixelSize;
       context.beginPath();
       context.moveTo(x0, y0);
       context.lineTo(x1, y1);

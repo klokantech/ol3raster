@@ -177,6 +177,7 @@ ol.reproj.Tile.prototype.reproject_ = function() {
   var width = goog.isNumber(size) ? size : size[0];
   var height = goog.isNumber(size) ? size : size[1];
   var context = ol.dom.createCanvasContext2D(width, height);
+  context.imageSmoothingEnabled = true;
 
   if (goog.DEBUG) {
     context.fillStyle =

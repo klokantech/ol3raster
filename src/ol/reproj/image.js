@@ -35,6 +35,7 @@ ol.reproj.Image = function(sourceProj, targetProj,
    * @type {Canvas2DRenderingContext}
    */
   this.context_ = ol.dom.createCanvasContext2D(width, height);
+  this.context_.imageSmoothingEnabled = true;
 
   if (goog.DEBUG) {
     this.context_.fillStyle = 'rgba(255,0,0,0.1)';
