@@ -4,6 +4,7 @@ goog.provide('ol.extent.Corner');
 goog.provide('ol.extent.Relationship');
 
 goog.require('goog.asserts');
+goog.require('goog.math');
 goog.require('goog.vec.Mat4');
 goog.require('ol.Coordinate');
 goog.require('ol.Size');
@@ -121,6 +122,28 @@ ol.extent.clone = function(extent, opt_extent) {
   } else {
     return extent.slice();
   }
+};
+
+
+/**
+ * @param {ol.Extent} extent Extent.
+ * @param {number} x X.
+ * @param {number} y Y.
+ * @return {ol.Coordinate} Closest coordinate inside the extent.
+ */
+ol.extent.closestCoordinateXY = function(extent, x, y) {
+  return [goog.math.clamp(x, extent[0], extent[2]),
+          goog.math.clamp(y, extent[1], extent[3])];
+};
+
+
+/**
+ * @param {ol.Extent} extent Extent.
+ * @param {ol.Coordinate} coordinate Coordinate.
+ * @return {ol.Coordinate} Closest coordinate inside the extent.
+ */
+ol.extent.closestCoordinate = function(extent, coordinate) {
+  return ol.extent.closestCoordinateXY(extent, coordinate[0], coordinate[1]);
 };
 
 
