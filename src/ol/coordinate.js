@@ -192,6 +192,34 @@ ol.coordinate.equals = function(coordinate1, coordinate2) {
 
 
 /**
+ * Calculates whether the the given `coordinate` is inside triangle defined by
+ * the `a`, `b` and `c` vertices (including the edges).
+ *
+ * @param {ol.Coordinate} coordinate The coordinate.
+ * @param {ol.Coordinate} a The first vertex.
+ * @param {ol.Coordinate} b The second vertex.
+ * @param {ol.Coordinate} c The third vertex.
+ * @return {boolean} Whether the passed coordinates is inside the triangle.
+ */
+ol.coordinate.isInTriangle = function(coordinate, a, b, c) {
+  var x = coordinate[0];
+  var y = coordinate[1];
+
+  var area = (-b[1] * c[0] + a[1] * (-b[0] + c[0]) +
+              a[0] * (b[1] - c[1]) + b[0] * c[1]) / 2;
+
+  // handle both directions of vertices
+  var sign = area < 0 ? -1 : 1;
+  var s = (a[1] * c[0] - a[0] * c[1] + (c[1] - a[1]) * x +
+           (a[0] - c[0]) * y) * sign;
+  var t = (a[0] * b[1] - a[1] * b[0] + (a[1] - b[1]) * x +
+           (b[0] - a[0]) * y) * sign;
+
+  return s >= 0 && t >= 0 && (s + t) <= 2 * area * sign;
+};
+
+
+/**
  * Rotate `coordinate` by `angle`. `coordinate` is modified in place and
  * returned by the function.
  *

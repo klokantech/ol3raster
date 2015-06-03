@@ -128,6 +128,42 @@ describe('ol.coordinate', function() {
         });
   });
 
+  describe('#isInTriangle', function() {
+    var a = [15, 40], b = [30, 22], c = [45, 60];
+    var inside = [30, 40];
+    var outside1 = [30, 55], outside2 = [20, 30], outside3 = [40, 35];
+    var onEdge = [30, 50];
+
+    it('calculates correctly', function() {
+      expect(ol.coordinate.isInTriangle(inside, a, b, c)).to.be(true);
+      expect(ol.coordinate.isInTriangle(outside1, a, b, c)).to.be(false);
+      expect(ol.coordinate.isInTriangle(outside2, a, b, c)).to.be(false);
+      expect(ol.coordinate.isInTriangle(outside3, a, b, c)).to.be(false);
+    });
+    it('calculates correctly for any point order', function() {
+      expect(ol.coordinate.isInTriangle(inside, a, b, c)).to.be(true);
+      expect(ol.coordinate.isInTriangle(inside, a, c, b)).to.be(true);
+      expect(ol.coordinate.isInTriangle(inside, b, a, c)).to.be(true);
+      expect(ol.coordinate.isInTriangle(inside, b, c, a)).to.be(true);
+      expect(ol.coordinate.isInTriangle(inside, c, a, b)).to.be(true);
+      expect(ol.coordinate.isInTriangle(inside, c, b, a)).to.be(true);
+
+      expect(ol.coordinate.isInTriangle(outside1, a, b, c)).to.be(false);
+      expect(ol.coordinate.isInTriangle(outside1, a, c, b)).to.be(false);
+      expect(ol.coordinate.isInTriangle(outside1, b, a, c)).to.be(false);
+      expect(ol.coordinate.isInTriangle(outside1, b, c, a)).to.be(false);
+      expect(ol.coordinate.isInTriangle(outside1, c, a, b)).to.be(false);
+      expect(ol.coordinate.isInTriangle(outside1, c, b, a)).to.be(false);
+    });
+    it('works for edge-points', function() {
+      expect(ol.coordinate.isInTriangle(onEdge, a, b, c)).to.be(true);
+
+      expect(ol.coordinate.isInTriangle(a, a, b, c)).to.be(true);
+      expect(ol.coordinate.isInTriangle(b, a, b, c)).to.be(true);
+      expect(ol.coordinate.isInTriangle(c, a, b, c)).to.be(true);
+    });
+  });
+
   describe('#rotate', function() {
     it('can rotate point in place', function() {
       var coord = [7.85, 47.983333];
