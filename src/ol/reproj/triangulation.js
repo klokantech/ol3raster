@@ -4,6 +4,7 @@ goog.provide('ol.reproj.triangulation');
 goog.require('goog.array');
 goog.require('goog.math');
 goog.require('ol.coordinate');
+goog.require('ol.ext.earcut');
 goog.require('ol.extent');
 goog.require('ol.proj');
 
@@ -29,8 +30,60 @@ ol.reproj.Triangulation;
 
 
 /**
+ * Calculates intersection of triangle (`a`,`b`,`c`) and `extent`.
+ * Uses Sutherland-Hodgman algorithm for intersection calculation.
+ * Triangulates the polygon if necessary.
+ *
+ * @param {ol.Coordinate} a
+ * @param {ol.Coordinate} b
+ * @param {ol.Coordinate} c
+ * @param {ol.Extent} extent
+ * @return {Array.<ol.Coordinate>} Raw triangles (flat array)
+ */
+ol.reproj.triangulation.triangulateTriangleExtentIntersection = function(
+    a, b, c, extent) {
+  var tl = ol.extent.getTopLeft(extent);
+  var tr = ol.extent.getTopRight(extent);
+  var bl = ol.extent.getBottomLeft(extent);
+  var br = ol.extent.getBottomRight(extent);
+  var edges = [[tl, tr], [tr, br], [br, bl], [bl, tl]];
+  var vertices = [a, b, c];
+
+  var isInside = function(a, b, p) {
+    return ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) <= 0;
+  };
+
+  goog.array.forEach(edges, function(edge, i, arr) {
+    var newVertices = [];
+    var S = vertices[vertices.length - 1];
+    goog.array.forEach(vertices, function(E, i, arr) {
+      if (isInside(edge[0], edge[1], E)) {
+        if (!isInside(edge[0], edge[1], S)) {
+          newVertices.push(ol.coordinate.getLineIntersection([S, E], edge));
+        }
+        newVertices.push(E);
+      } else if (isInside(edge[0], edge[1], S)) {
+        newVertices.push(ol.coordinate.getLineIntersection([S, E], edge));
+      }
+      S = E;
+    });
+    vertices = newVertices;
+  });
+
+  if (vertices.length < 3) {
+    // less than 3 (usually 0) -> no valid triangle left
+    return [];
+  } else if (vertices.length == 3) {
+    return vertices;
+  } else {
+    // triangulate the result
+    return ol.ext.earcut([vertices], false);
+  }
+};
+
+
+/**
  * Adds triangle to the triangulation (and reprojects the vertices) if valid.
- * @private
  * @param {ol.reproj.Triangulation} triangulation
  * @param {ol.Coordinate} a
  * @param {ol.Coordinate} b
@@ -39,9 +92,13 @@ ol.reproj.Triangulation;
  * @param {ol.proj.Projection} targetProj
  * @param {ol.Extent=} opt_maxTargetExtent
  * @param {ol.Extent=} opt_maxSourceExtent
+ * @param {ol.Coordinate=} opt_aSrc Already transformed source point for a.
+ * @param {ol.Coordinate=} opt_bSrc Already transformed source point for b.
+ * @param {ol.Coordinate=} opt_cSrc Already transformed source point for c.
  */
-ol.reproj.triangulation.addTriangleIfValid_ = function(triangulation, a, b, c,
-    sourceProj, targetProj, opt_maxTargetExtent, opt_maxSourceExtent) {
+ol.reproj.triangulation.addTriangleIfValid = function(triangulation, a, b, c,
+    sourceProj, targetProj, opt_maxTargetExtent, opt_maxSourceExtent,
+    opt_aSrc, opt_bSrc, opt_cSrc) {
   if (goog.isDefAndNotNull(opt_maxTargetExtent)) {
     if (!ol.extent.containsCoordinate(opt_maxTargetExtent, a) &&
         !ol.extent.containsCoordinate(opt_maxTargetExtent, b) &&
@@ -55,9 +112,9 @@ ol.reproj.triangulation.addTriangleIfValid_ = function(triangulation, a, b, c,
     c = ol.extent.closestCoordinate(opt_maxTargetExtent, c);
   }
   var transformInv = ol.proj.getTransform(targetProj, sourceProj);
-  var aSrc = transformInv(a);
-  var bSrc = transformInv(b);
-  var cSrc = transformInv(c);
+  var aSrc = goog.isDef(opt_aSrc) ? opt_aSrc : transformInv(a);
+  var bSrc = goog.isDef(opt_bSrc) ? opt_bSrc : transformInv(b);
+  var cSrc = goog.isDef(opt_cSrc) ? opt_cSrc : transformInv(c);
   if (goog.isDefAndNotNull(opt_maxSourceExtent)) {
     var srcTriangleExtent = ol.extent.boundingExtent([aSrc, bSrc, cSrc]);
     if (!ol.extent.intersects(srcTriangleExtent, opt_maxSourceExtent)) {
@@ -69,15 +126,25 @@ ol.reproj.triangulation.addTriangleIfValid_ = function(triangulation, a, b, c,
         !ol.extent.containsCoordinate(opt_maxSourceExtent, bSrc) ||
         !ol.extent.containsCoordinate(opt_maxSourceExtent, cSrc)) {
       // if any vertex is outside projection range, modify the target triangle
-      // TODO: do not do closestCoordinate, but rather scale the triangle with
-      //       respect to a point inside the extent
-      aSrc = ol.extent.closestCoordinate(opt_maxSourceExtent, aSrc);
-      bSrc = ol.extent.closestCoordinate(opt_maxSourceExtent, bSrc);
-      cSrc = ol.extent.closestCoordinate(opt_maxSourceExtent, cSrc);
+
+      var tris = ol.reproj.triangulation.triangulateTriangleExtentIntersection(
+          aSrc, bSrc, cSrc, opt_maxSourceExtent);
       var transformFwd = ol.proj.getTransform(sourceProj, targetProj);
-      a = transformFwd(aSrc);
-      b = transformFwd(bSrc);
-      c = transformFwd(cSrc);
+      var triCount = Math.floor(tris.length / 3);
+      for (var i = 0; i < triCount; i++) {
+        var aSrc_ = tris[3 * i],
+            bSrc_ = tris[3 * i + 1],
+            cSrc_ = tris[3 * i + 2];
+        var a_ = transformFwd(aSrc_),
+            b_ = transformFwd(bSrc_),
+            c_ = transformFwd(cSrc_);
+        // Add the triangle. Do not have to pass the extents, because
+        // the validation is already done. Also pass the already transformed
+        // points to optimize performance.
+        ol.reproj.triangulation.addTriangleIfValid(triangulation, a_, b_, c_,
+            sourceProj, targetProj, undefined, undefined, aSrc_, bSrc_, cSrc_);
+      }
+      return;
     }
   }
   var needsShift = false;
@@ -152,10 +219,10 @@ ol.reproj.triangulation.createForExtent = function(extent, sourceProj,
         goog.math.lerp(tlDst[1], brDst[1], (y + 1) / subdiv)
       ];
 
-      ol.reproj.triangulation.addTriangleIfValid_(
+      ol.reproj.triangulation.addTriangleIfValid(
           triangulation, x0y0dst, x1y1dst, x0y1dst,
           sourceProj, targetProj, opt_maxTargetExtent, opt_maxSourceExtent);
-      ol.reproj.triangulation.addTriangleIfValid_(
+      ol.reproj.triangulation.addTriangleIfValid(
           triangulation, x0y0dst, x1y0dst, x1y1dst,
           sourceProj, targetProj, opt_maxTargetExtent, opt_maxSourceExtent);
     }
