@@ -17,11 +17,20 @@ goog.require('ol.math');
  */
 ol.reproj.renderTriangles = function(context,
     sourceResolution, targetResolution, targetExtent, triangulation, sources) {
-  goog.array.forEach(triangulation, function(triangle, i, arr) {
+  goog.array.forEach(triangulation, function(tri, i, arr) {
     context.save();
 
-    // calc affine transform (src -> dst)
-    /*
+    var targetTL = ol.extent.getTopLeft(targetExtent);
+
+    /* Calculate affine transform (src -> dst)
+     * Resulting matrix can be used to transform coordinate
+     * from `sourceProjection` to destination pixels.
+     *
+     * To optimize number of context calls and increase numerical stability,
+     * we also do the following operations:
+     * trans(-topLeftExtentCorner), scale(1 / targetResolution), scale(1, -1)
+     * here before solving the linear system.
+     *
      * Src points: xi, yi
      * Dst points: ui, vi
      * Affine coefficients: aij
@@ -33,37 +42,27 @@ ol.reproj.renderTriangles = function(context,
      * |  0  0 0 x1 y1 1 |   |a11|   |v1|
      * |  0  0 0 x2 y2 1 |   |a12|   |v2|
      */
-    var x0 = triangle[0][0][0], y0 = triangle[0][0][1],
-        x1 = triangle[1][0][0], y1 = triangle[1][0][1],
-        x2 = triangle[2][0][0], y2 = triangle[2][0][1];
-    var u0 = triangle[0][1][0], v0 = triangle[0][1][1],
-        u1 = triangle[1][1][0], v1 = triangle[1][1][1],
-        u2 = triangle[2][1][0], v2 = triangle[2][1][1];
+    var x0 = tri[0][0][0], y0 = tri[0][0][1],
+        x1 = tri[1][0][0], y1 = tri[1][0][1],
+        x2 = tri[2][0][0], y2 = tri[2][0][1];
+    var u0 = tri[0][1][0] - targetTL[0], v0 = -(tri[0][1][1] - targetTL[1]),
+        u1 = tri[1][1][0] - targetTL[0], v1 = -(tri[1][1][1] - targetTL[1]),
+        u2 = tri[2][1][0] - targetTL[0], v2 = -(tri[2][1][1] - targetTL[1]);
     var augmentedMatrix = [
-      [x0, y0, 1, 0, 0, 0, u0],
-      [x1, y1, 1, 0, 0, 0, u1],
-      [x2, y2, 1, 0, 0, 0, u2],
-      [0, 0, 0, x0, y0, 1, v0],
-      [0, 0, 0, x1, y1, 1, v1],
-      [0, 0, 0, x2, y2, 1, v2]
+      [x0, y0, 1, 0, 0, 0, u0 / targetResolution],
+      [x1, y1, 1, 0, 0, 0, u1 / targetResolution],
+      [x2, y2, 1, 0, 0, 0, u2 / targetResolution],
+      [0, 0, 0, x0, y0, 1, v0 / targetResolution],
+      [0, 0, 0, x1, y1, 1, v1 / targetResolution],
+      [0, 0, 0, x2, y2, 1, v2 / targetResolution]
     ];
     var coefs = ol.math.solveLinearSystem(augmentedMatrix);
     if (goog.isNull(coefs)) {
       return;
     }
 
-    //context.translate(0, destinationHeight);
-    context.scale(1, -1);
-
-    context.scale(1 / targetResolution, 1 / targetResolution);
-    var targetTopLeft = ol.extent.getTopLeft(targetExtent);
-    context.translate(-targetTopLeft[0], -targetTopLeft[1]);
-    context.transform(coefs[0], coefs[3], coefs[1],
-                      coefs[4], coefs[2], coefs[5]);
-
-    //context.translate(tlSrc[0], tlSrc[1]);
-    //context.scale(1 / targetResolution, 1 / targetResolution);
-    //context.scale(1 / 2, 1 / 2);
+    context.setTransform(coefs[0], coefs[3], coefs[1],
+                         coefs[4], coefs[2], coefs[5]);
 
     var pixelSize = sourceResolution;
     var centroid = [(x0 + x1 + x2) / 3, (y0 + y1 + y2) / 3];
