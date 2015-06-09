@@ -154,6 +154,45 @@ describe('ol.math.sinh', function() {
 });
 
 
+describe('ol.math.solveLinearSystem', function() {
+  it('calculates correctly', function() {
+    var result = ol.math.solveLinearSystem([
+      [2, 1, 3, 1],
+      [2, 6, 8, 3],
+      [6, 8, 18, 5]
+    ]);
+    expect(result[0]).to.roughlyEqual(0.3, 1e-9);
+    expect(result[1]).to.roughlyEqual(0.4, 1e-9);
+    expect(result[2]).to.roughlyEqual(0, 1e-9);
+  });
+  it('can handle singular matrix', function() {
+    var result = ol.math.solveLinearSystem([
+      [2, 1, 3, 1],
+      [2, 6, 8, 3],
+      [2, 1, 3, 1]
+    ]);
+    expect(result).to.be(null);
+  });
+  it('raises an exception when the matrix is malformed', function() {
+    expect(function() {
+      ol.math.solveLinearSystem([
+        [2, 1, 3, 1],
+        [2, 6, 8, 3],
+        [6, 8, 18]
+      ]);
+    }).to.throwException();
+
+    expect(function() {
+      ol.math.solveLinearSystem([
+        [2, 1, 3, 1],
+        [2, 6, 8, 3],
+        [6, 8, 18, 5, 0]
+      ]);
+    }).to.throwException();
+  });
+});
+
+
 describe('ol.math.tanh', function() {
 
   it('returns the correct value at -1', function() {
