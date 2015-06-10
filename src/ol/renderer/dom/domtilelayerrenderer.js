@@ -130,7 +130,8 @@ ol.renderer.dom.TileLayer.prototype.prepareFrame =
   var tilesToDrawByZ = {};
   tilesToDrawByZ[z] = {};
 
-  var findLoadedTiles = this.createLoadedTileFinder(tileSource, tilesToDrawByZ);
+  var findLoadedTiles = this.createLoadedTileFinder(
+      tileSource, projection, tilesToDrawByZ);
 
   var useInterimTilesOnError = tileLayer.getUseInterimTilesOnError();
 
