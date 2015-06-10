@@ -129,6 +129,18 @@ ol.reproj.triangulation.addTriangleIfValid = function(triangulation, a, b, c,
         !ol.extent.containsCoordinate(opt_maxSourceExtent, cSrc)) {
       // if any vertex is outside projection range, modify the target triangle
 
+      var makeFinite = function(coord, extent) {
+        if (!goog.math.isFiniteNumber(coord[0])) {
+          coord[0] = goog.math.clamp(coord[0], extent[0], extent[2]);
+        }
+        if (!goog.math.isFiniteNumber(coord[1])) {
+          coord[1] = goog.math.clamp(coord[1], extent[1], extent[3]);
+        }
+      };
+      makeFinite(aSrc, opt_maxSourceExtent);
+      makeFinite(bSrc, opt_maxSourceExtent);
+      makeFinite(cSrc, opt_maxSourceExtent);
+
       var tris = ol.reproj.triangulation.triangulateTriangleExtentIntersection(
           aSrc, bSrc, cSrc, opt_maxSourceExtent);
       var transformFwd = ol.proj.getTransform(sourceProj, targetProj);
