@@ -7,6 +7,8 @@ goog.require('ol.Attribution');
 goog.require('ol.Extent');
 goog.require('ol.ImageState');
 goog.require('ol.array');
+goog.require('ol.proj');
+goog.require('ol.reproj.Image');
 goog.require('ol.source.Source');
 
 
@@ -89,7 +91,39 @@ ol.source.Image.prototype.findNearestResolution =
  * @param {ol.proj.Projection} projection Projection.
  * @return {ol.ImageBase} Single image.
  */
-ol.source.Image.prototype.getImage = goog.abstractMethod;
+ol.source.Image.prototype.getImage =
+    function(extent, resolution, pixelRatio, projection) {
+  var sourceProjection = this.getProjection();
+  if (!ol.ENABLE_RASTER_REPROJECTION ||
+      !goog.isDefAndNotNull(sourceProjection) ||
+      !goog.isDefAndNotNull(projection) ||
+      ol.proj.equivalent(sourceProjection, projection)) {
+    if (!goog.isNull(sourceProjection)) {
+      projection = sourceProjection;
+    }
+    return this.getImageInternal(extent, resolution, pixelRatio, projection);
+  } else {
+    var image = new ol.reproj.Image(
+        sourceProjection, projection, extent, resolution, pixelRatio,
+        goog.bind(function(extent, resolution, pixelRatio) {
+          return this.getImageInternal(extent, resolution,
+              pixelRatio, sourceProjection);
+        }, this));
+
+    return image;
+  }
+};
+
+
+/**
+ * @param {ol.Extent} extent Extent.
+ * @param {number} resolution Resolution.
+ * @param {number} pixelRatio Pixel ratio.
+ * @param {ol.proj.Projection} projection Projection.
+ * @return {ol.ImageBase} Single image.
+ * @protected
+ */
+ol.source.Image.prototype.getImageInternal = goog.abstractMethod;
 
 
 /**
