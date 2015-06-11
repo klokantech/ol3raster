@@ -185,7 +185,7 @@ ol.source.ImageWMS.prototype.getParams = function() {
 /**
  * @inheritDoc
  */
-ol.source.ImageWMS.prototype.getImage =
+ol.source.ImageWMS.prototype.getImageInternal =
     function(extent, resolution, pixelRatio, projection) {
 
   if (!goog.isDef(this.url_)) {
