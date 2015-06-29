@@ -23,9 +23,56 @@ ol.reproj.Triangle;
 
 
 /**
+ * @param {ol.proj.Projection} sourceProj
+ * @param {ol.proj.Projection} targetProj
+ * @param {ol.Extent} targetExtent
+ * @param {ol.Extent=} opt_maxSourceExtent
+ * @param {number=} opt_maxSubdiv Maximal subdivision.
+ * @param {number=} opt_errorThreshold Acceptable error (in source units).
  * @constructor
  */
-ol.reproj.Triangulation = function() {
+ol.reproj.Triangulation = function(sourceProj, targetProj, targetExtent,
+    opt_maxSourceExtent, opt_maxSubdiv, opt_errorThreshold) {
+
+  /**
+   * @type {ol.proj.Projection}
+   * @private
+   */
+  this.sourceProj_ = sourceProj;
+
+  /**
+   * @type {ol.proj.Projection}
+   * @private
+   */
+  this.targetProj_ = targetProj;
+
+  /**
+   * @type {ol.TransformFunction}
+   * @private
+   */
+  this.transformFwd_ = ol.proj.getTransform(this.sourceProj_, this.targetProj_);
+
+  /**
+   * @type {ol.TransformFunction}
+   * @private
+   */
+  this.transformInv_ = ol.proj.getTransform(this.targetProj_, this.sourceProj_);
+
+  /**
+   * @type {ol.Extent}
+   * @private
+   */
+  this.maxSourceExtent_ = goog.isDef(opt_maxSourceExtent) ?
+                          opt_maxSourceExtent : null;
+
+  var errorThreshold = goog.isDef(opt_errorThreshold) ?
+                       opt_errorThreshold : null; //TODO: define
+  /**
+   * @type {number}
+   * @private
+   */
+  this.errorThresholdSquared_ = errorThreshold * errorThreshold;
+
   /**
    * @type {Array.<ol.reproj.Triangle>}
    * @private
@@ -39,6 +86,18 @@ ol.reproj.Triangulation = function() {
    * @private
    */
   this.needsShift_ = false;
+
+  var tlDst = ol.extent.getTopLeft(targetExtent);
+  var trDst = ol.extent.getTopRight(targetExtent);
+  var brDst = ol.extent.getBottomRight(targetExtent);
+  var blDst = ol.extent.getBottomLeft(targetExtent);
+  var tlDstSrc = this.transformInv_(tlDst);
+  var trDstSrc = this.transformInv_(trDst);
+  var brDstSrc = this.transformInv_(brDst);
+  var blDstSrc = this.transformInv_(blDst);
+
+  this.addQuadIfValid_(tlDst, trDst, brDst, blDst,
+                       tlDstSrc, trDstSrc, brDstSrc, blDstSrc, opt_maxSubdiv);
 };
 
 
@@ -109,14 +168,12 @@ ol.reproj.Triangulation.triangulateQuadExtentIntersection_ = function(
  * @param {ol.Coordinate} aSrc
  * @param {ol.Coordinate} bSrc
  * @param {ol.Coordinate} cSrc
- * @param {ol.proj.Projection} sourceProj
- * @param {ol.proj.Projection} targetProj
  * @private
  */
 ol.reproj.Triangulation.prototype.addTriangle_ = function(a, b, c,
-    aSrc, bSrc, cSrc, sourceProj, targetProj) {
+    aSrc, bSrc, cSrc) {
   var needsShift = false;
-  if (sourceProj.canWrapX()) {
+  if (this.sourceProj_.canWrapX()) {
     // determine if the triangle crosses the dateline here
     // This can be detected by transforming centroid of the target triangle.
     // If the transformed centroid is outside the transformed triangle,
@@ -124,7 +181,7 @@ ol.reproj.Triangulation.prototype.addTriangle_ = function(a, b, c,
 
     var centroid = [(a[0] + b[0] + c[0]) / 3,
                     (a[1] + b[1] + c[1]) / 3];
-    var centroidSrc = ol.proj.transform(centroid, targetProj, sourceProj);
+    var centroidSrc = this.transformInv_(centroid);
     if (!ol.coordinate.isInTriangle(centroidSrc, aSrc, bSrc, cSrc)) {
       needsShift = true;
     }
@@ -151,76 +208,63 @@ ol.reproj.Triangulation.prototype.addTriangle_ = function(a, b, c,
  * @param {ol.Coordinate} bSrc
  * @param {ol.Coordinate} cSrc
  * @param {ol.Coordinate} dSrc
- * @param {ol.proj.Projection} sourceProj
- * @param {ol.proj.Projection} targetProj
- * @param {ol.Extent=} opt_maxSourceExtent
  * @param {number=} opt_maxSubdiv Maximal subdivision.
- * @param {number=} opt_errorThreshold Acceptable error threshold (in pixels).
  * @private
  */
 ol.reproj.Triangulation.prototype.addQuadIfValid_ = function(a, b, c, d,
-    aSrc, bSrc, cSrc, dSrc,
-    sourceProj, targetProj, opt_maxSourceExtent,
-    opt_maxSubdiv, opt_errorThreshold) {
+    aSrc, bSrc, cSrc, dSrc, opt_maxSubdiv) {
 
-  if (goog.isDefAndNotNull(opt_maxSourceExtent)) {
+  if (!goog.isNull(this.maxSourceExtent_)) {
     var srcQuadExtent = ol.extent.boundingExtent([aSrc, bSrc, cSrc, dSrc]);
-    if (!ol.extent.intersects(srcQuadExtent, opt_maxSourceExtent)) {
+    if (!ol.extent.intersects(srcQuadExtent, this.maxSourceExtent_)) {
       // whole quad outside source projection extent -> ignore
       return;
     }
   }
-  if (goog.isDef(opt_errorThreshold) && opt_maxSubdiv > 0) {
-    var transformInv = ol.proj.getTransform(targetProj, sourceProj);
-
+  if (opt_maxSubdiv > 0) {
     var centerTarget = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
-    var centerSource = transformInv(centerTarget);
+    var centerSource = this.transformInv_(centerTarget);
     var centerSourceEstim = [(aSrc[0] + cSrc[0]) / 2, (aSrc[1] + cSrc[1]) / 2];
 
     var centerSourceErrorSquared = ol.coordinate.squaredDistance(
         centerSourceEstim, centerSource);
-    if (centerSourceErrorSquared >
-        (opt_errorThreshold) * (opt_errorThreshold)) {
+    if (centerSourceErrorSquared > this.errorThresholdSquared_) {
       var ab = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      var abSrc = transformInv(ab);
+      var abSrc = this.transformInv_(ab);
       var bc = [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2];
-      var bcSrc = transformInv(bc);
+      var bcSrc = this.transformInv_(bc);
       var cd = [(c[0] + d[0]) / 2, (c[1] + d[1]) / 2];
-      var cdSrc = transformInv(cd);
+      var cdSrc = this.transformInv_(cd);
       var da = [(d[0] + a[0]) / 2, (d[1] + a[1]) / 2];
-      var daSrc = transformInv(da);
+      var daSrc = this.transformInv_(da);
 
       this.addQuadIfValid_(
           a, ab, centerTarget, da,
           aSrc, abSrc, centerSource, daSrc,
-          sourceProj, targetProj, opt_maxSourceExtent,
-          opt_maxSubdiv - 1, opt_errorThreshold);
+          opt_maxSubdiv - 1);
       this.addQuadIfValid_(
           ab, b, bc, centerTarget,
           abSrc, bSrc, bcSrc, centerSource,
-          sourceProj, targetProj, opt_maxSourceExtent,
-          opt_maxSubdiv - 1, opt_errorThreshold);
+          opt_maxSubdiv - 1);
       this.addQuadIfValid_(
           centerTarget, bc, c, cd,
           centerSource, bcSrc, cSrc, cdSrc,
-          sourceProj, targetProj, opt_maxSourceExtent,
-          opt_maxSubdiv - 1, opt_errorThreshold);
+          opt_maxSubdiv - 1);
       this.addQuadIfValid_(
           da, centerTarget, cd, d,
           daSrc, centerSource, cdSrc, dSrc,
-          sourceProj, targetProj, opt_maxSourceExtent,
-          opt_maxSubdiv - 1, opt_errorThreshold);
+          opt_maxSubdiv - 1);
 
       return;
     }
   }
 
-  if (goog.isDefAndNotNull(opt_maxSourceExtent)) {
-    if (!ol.extent.containsCoordinate(opt_maxSourceExtent, aSrc) ||
-        !ol.extent.containsCoordinate(opt_maxSourceExtent, bSrc) ||
-        !ol.extent.containsCoordinate(opt_maxSourceExtent, cSrc) ||
-        !ol.extent.containsCoordinate(opt_maxSourceExtent, dSrc)) {
-      // if any vertex is outside projection range, modify the target triangle
+  if (goog.isDefAndNotNull(this.maxSourceExtent_)) {
+    if (!ol.extent.containsCoordinate(this.maxSourceExtent_, aSrc) ||
+        !ol.extent.containsCoordinate(this.maxSourceExtent_, bSrc) ||
+        !ol.extent.containsCoordinate(this.maxSourceExtent_, cSrc) ||
+        !ol.extent.containsCoordinate(this.maxSourceExtent_, dSrc)) {
+      // if any vertex is outside projection range, modify the target quad
 
       var makeFinite = function(coord, extent) {
         if (!goog.math.isFiniteNumber(coord[0])) {
@@ -230,74 +274,35 @@ ol.reproj.Triangulation.prototype.addQuadIfValid_ = function(a, b, c, d,
           coord[1] = goog.math.clamp(coord[1], extent[1], extent[3]);
         }
       };
-      makeFinite(aSrc, opt_maxSourceExtent);
-      makeFinite(bSrc, opt_maxSourceExtent);
-      makeFinite(cSrc, opt_maxSourceExtent);
-      makeFinite(dSrc, opt_maxSourceExtent);
+      makeFinite(aSrc, this.maxSourceExtent_);
+      makeFinite(bSrc, this.maxSourceExtent_);
+      makeFinite(cSrc, this.maxSourceExtent_);
+      makeFinite(dSrc, this.maxSourceExtent_);
 
       var tris = ol.reproj.Triangulation.triangulateQuadExtentIntersection_(
-          aSrc, bSrc, cSrc, dSrc, opt_maxSourceExtent);
-      var transformFwd = ol.proj.getTransform(sourceProj, targetProj);
+          aSrc, bSrc, cSrc, dSrc, this.maxSourceExtent_);
       var triCount = Math.floor(tris.length / 3);
       for (var i = 0; i < triCount; i++) {
         var aSrc_ = tris[3 * i],
             bSrc_ = tris[3 * i + 1],
             cSrc_ = tris[3 * i + 2];
-        var a_ = transformFwd(aSrc_),
-            b_ = transformFwd(bSrc_),
-            c_ = transformFwd(cSrc_);
-        this.addTriangle_(a_, b_, c_, aSrc_, bSrc_, cSrc_,
-                          sourceProj, targetProj);
+        var a_ = this.transformFwd_(aSrc_),
+            b_ = this.transformFwd_(bSrc_),
+            c_ = this.transformFwd_(cSrc_);
+        this.addTriangle_(a_, b_, c_, aSrc_, bSrc_, cSrc_);
       }
       return;
     }
   }
-  this.addTriangle_(a, c, d, aSrc, cSrc, dSrc, sourceProj, targetProj);
-  this.addTriangle_(a, b, c, aSrc, bSrc, cSrc, sourceProj, targetProj);
+  this.addTriangle_(a, c, d, aSrc, cSrc, dSrc);
+  this.addTriangle_(a, b, c, aSrc, bSrc, cSrc);
 };
 
 
 /**
- * Triangulates given extent and reprojects vertices.
- * @param {ol.Extent} extent
- * @param {ol.proj.Projection} sourceProj
- * @param {ol.proj.Projection} targetProj
- * @param {ol.Extent=} opt_maxSourceExtent
- * @param {number=} opt_maxSubdiv Maximal subdivision (default 4).
- * @param {number=} opt_errorThreshold Acceptable error threshold (in pixels).
- * @return {!ol.reproj.Triangulation}
- */
-ol.reproj.Triangulation.createForExtent = function(extent, sourceProj,
-    targetProj, opt_maxSourceExtent,
-    opt_maxSubdiv, opt_errorThreshold) {
-
-  var triangulation = new ol.reproj.Triangulation();
-
-  var transformInv = ol.proj.getTransform(targetProj, sourceProj);
-  var tlDst = ol.extent.getTopLeft(extent);
-  var trDst = ol.extent.getTopRight(extent);
-  var brDst = ol.extent.getBottomRight(extent);
-  var blDst = ol.extent.getBottomLeft(extent);
-  var tlDstSrc = transformInv(tlDst);
-  var trDstSrc = transformInv(trDst);
-  var brDstSrc = transformInv(brDst);
-  var blDstSrc = transformInv(blDst);
-
-  triangulation.addQuadIfValid_(
-      tlDst, trDst, brDst, blDst,
-      tlDstSrc, trDstSrc, brDstSrc, blDstSrc,
-      sourceProj, targetProj, opt_maxSourceExtent,
-      opt_maxSubdiv, opt_errorThreshold);
-
-  return triangulation;
-};
-
-
-/**
- * @param {ol.proj.Projection} sourceProj
  * @return {ol.Extent}
  */
-ol.reproj.Triangulation.prototype.calculateSourceExtent = function(sourceProj) {
+ol.reproj.Triangulation.prototype.calculateSourceExtent = function() {
   var extent = ol.extent.createEmpty();
 
   if (this.needsShift_) {
@@ -305,7 +310,7 @@ ol.reproj.Triangulation.prototype.calculateSourceExtent = function(sourceProj) {
     // all coordiantes need to be "shifted" to be positive
     // to properly calculate the extent (and then possibly shifted back)
 
-    var sourceProjExtent = sourceProj.getExtent();
+    var sourceProjExtent = this.sourceProj_.getExtent();
     var sourceProjWidth = ol.extent.getWidth(sourceProjExtent);
     goog.array.forEach(this.triangles_, function(triangle, i, arr) {
       var src = triangle.source;

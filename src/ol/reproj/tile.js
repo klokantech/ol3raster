@@ -102,9 +102,8 @@ ol.reproj.Tile = function(sourceProj, sourceTileGrid,
    * @private
    * @type {!ol.reproj.Triangulation}
    */
-  this.triangulation_ = ol.reproj.Triangulation.createForExtent(
-      limitedTargetExtent, sourceProj, targetProj,
-      maxSourceExtent,
+  this.triangulation_ = new ol.reproj.Triangulation(
+      sourceProj, targetProj, limitedTargetExtent, maxSourceExtent,
       5, errorThreshold);
 
   if (this.triangulation_.getTriangles().length === 0) {
@@ -125,7 +124,7 @@ ol.reproj.Tile = function(sourceProj, sourceTileGrid,
   }
 
   this.srcZ_ = sourceTileGrid.getZForResolution(sourceResolution);
-  var srcExtent = this.triangulation_.calculateSourceExtent(sourceProj);
+  var srcExtent = this.triangulation_.calculateSourceExtent();
 
   var sourceProjExtent = sourceProj.getExtent();
   if (!sourceProj.isGlobal() && sourceProjExtent) {

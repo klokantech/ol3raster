@@ -62,9 +62,8 @@ ol.reproj.Image = function(sourceProj, targetProj,
    * @private
    * @type {!ol.reproj.Triangulation}
    */
-  this.triangulation_ = ol.reproj.Triangulation.createForExtent(
-      limitedTargetExtent, sourceProj, targetProj,
-      this.maxSourceExtent_);
+  this.triangulation_ = new ol.reproj.Triangulation(
+      sourceProj, targetProj, limitedTargetExtent, this.maxSourceExtent_);
 
   /**
    * @private
@@ -78,7 +77,7 @@ ol.reproj.Image = function(sourceProj, targetProj,
    */
   this.targetExtent_ = targetExtent;
 
-  var srcExtent = this.triangulation_.calculateSourceExtent(sourceProj);
+  var srcExtent = this.triangulation_.calculateSourceExtent();
 
   var targetCenter = ol.extent.getCenter(targetExtent);
   var sourceResolution = ol.reproj.calculateSourceResolution(
