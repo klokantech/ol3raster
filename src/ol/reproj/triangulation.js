@@ -175,30 +175,22 @@ ol.reproj.Triangulation.triangulateQuadExtentIntersection_ = function(
  * @param {ol.Coordinate} aSrc
  * @param {ol.Coordinate} bSrc
  * @param {ol.Coordinate} cSrc
+ * @param {boolean} wrapsX
  * @private
  */
 ol.reproj.Triangulation.prototype.addTriangle_ = function(a, b, c,
-    aSrc, bSrc, cSrc) {
-  var needsShift = false;
-  if (this.sourceProj_.canWrapX()) {
-    // determine if the triangle crosses the dateline here
-    // This can be detected by transforming centroid of the target triangle.
-    // If the transformed centroid is outside the transformed triangle,
-    // the triangle wraps around projection extent.
+    aSrc, bSrc, cSrc, wrapsX) {
+  // wrapsX could be determined by transforming centroid of the target triangle.
+  // If the transformed centroid is outside the transformed triangle,
+  // the triangle wraps around projection extent.
+  // However, this would require additional transformation call.
 
-    var centroid = [(a[0] + b[0] + c[0]) / 3,
-                    (a[1] + b[1] + c[1]) / 3];
-    var centroidSrc = this.transformInv_(centroid);
-    if (!ol.coordinate.isInTriangle(centroidSrc, aSrc, bSrc, cSrc)) {
-      needsShift = true;
-    }
-  }
   this.triangles_.push({
     source: [aSrc, bSrc, cSrc],
     target: [a, b, c],
-    needsShift: needsShift
+    needsShift: wrapsX
   });
-  if (needsShift) {
+  if (wrapsX) {
     this.needsShift_ = true;
   }
 };
@@ -228,15 +220,14 @@ ol.reproj.Triangulation.prototype.addQuadIfValid_ = function(a, b, c, d,
       return;
     }
   }
+  var srcCoverageX = ol.extent.getWidth(srcQuadExtent) / this.sourceWorldWidth_;
+
+  // when the quad is wrapped in the source projection
+  // it covers most of the projection extent, but not fully
+  var wrapsX = this.sourceProj_.canWrapX() &&
+               srcCoverageX > 0.5 && srcCoverageX < 1;
+
   if (maxSubdiv > 0) {
-    var srcQuadWidth = ol.extent.getWidth(srcQuadExtent);
-    var srcCoverageX = srcQuadWidth / this.sourceWorldWidth_;
-
-    // when the quad is wrapped in the source projection
-    // it covers most of the projection extent, but not fully
-    var wrapsX = this.sourceProj_.canWrapX() &&
-                 srcCoverageX > 0.5 && srcCoverageX < 1;
-
     var needsSubdivision = !wrapsX && this.sourceProj_.isGlobal() &&
                            srcCoverageX > 0.25; //TODO: define
 
@@ -311,13 +302,13 @@ ol.reproj.Triangulation.prototype.addQuadIfValid_ = function(a, b, c, d,
         var a_ = this.transformFwd_(aSrc_),
             b_ = this.transformFwd_(bSrc_),
             c_ = this.transformFwd_(cSrc_);
-        this.addTriangle_(a_, b_, c_, aSrc_, bSrc_, cSrc_);
+        this.addTriangle_(a_, b_, c_, aSrc_, bSrc_, cSrc_, wrapsX);
       }
       return;
     }
   }
-  this.addTriangle_(a, c, d, aSrc, cSrc, dSrc);
-  this.addTriangle_(a, b, c, aSrc, bSrc, cSrc);
+  this.addTriangle_(a, c, d, aSrc, cSrc, dSrc, wrapsX);
+  this.addTriangle_(a, b, c, aSrc, bSrc, cSrc, wrapsX);
 };
 
 
