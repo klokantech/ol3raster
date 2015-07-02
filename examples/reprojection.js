@@ -50,6 +50,11 @@ proj4.defs('EPSG:2163', '+proj=laea +lat_0=45 +lon_0=-100 +x_0=0 +y_0=0 ' +
 var proj2163 = ol.proj.get('EPSG:2163');
 proj2163.setExtent([-8040784.5135, -2577524.9210, 3668901.4484, 4785105.1096]);
 
+proj4.defs('ESRI:54009', '+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 ' +
+    '+units=m +no_defs');
+var proj54009 = ol.proj.get('ESRI:54009');
+proj54009.setExtent([-18e6, -9e6, 18e6, 9e6]);
+
 
 var layers = [];
 
