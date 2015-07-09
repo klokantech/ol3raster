@@ -6,6 +6,7 @@ goog.require('ol.format.WMTSCapabilities');
 goog.require('ol.layer.Tile');
 goog.require('ol.proj');
 goog.require('ol.source.MapQuest');
+goog.require('ol.source.TileImage');
 goog.require('ol.source.TileWMS');
 goog.require('ol.source.WMTS');
 goog.require('ol.source.XYZ');
@@ -132,6 +133,8 @@ var map = new ol.Map({
 var baseMapSelect = document.getElementById('base-map');
 var overlayMapSelect = document.getElementById('overlay-map');
 var viewProjSelect = document.getElementById('view-projection');
+var renderEdgesCheckbox = document.getElementById('render-edges');
+var renderEdges = false;
 
 function updateViewProjection() {
   var newProj = ol.proj.get(viewProjSelect.value);
@@ -155,6 +158,15 @@ viewProjSelect.onchange = function(e) {
 
 updateViewProjection();
 
+var updateRenderEdgesOnLayer = function(layer) {
+  if (layer instanceof ol.layer.Tile) {
+    var source = layer.getSource();
+    if (source instanceof ol.source.TileImage) {
+      source.setRenderReprojectionEdges(renderEdges);
+    }
+  }
+};
+
 
 /**
  * @param {Event} e Change event.
@@ -163,6 +175,7 @@ baseMapSelect.onchange = function(e) {
   var layer = layers[baseMapSelect.value];
   if (layer) {
     layer.setOpacity(1);
+    updateRenderEdgesOnLayer(layer);
     map.getLayers().setAt(0, layer);
   }
 };
@@ -175,6 +188,18 @@ overlayMapSelect.onchange = function(e) {
   var layer = layers[overlayMapSelect.value];
   if (layer) {
     layer.setOpacity(0.7);
+    updateRenderEdgesOnLayer(layer);
     map.getLayers().setAt(1, layer);
   }
+};
+
+
+/**
+ * @param {Event} e Change event.
+ */
+renderEdgesCheckbox.onchange = function(e) {
+  renderEdges = renderEdgesCheckbox.checked;
+  map.getLayers().forEach(function(layer) {
+    updateRenderEdgesOnLayer(layer);
+  });
 };
