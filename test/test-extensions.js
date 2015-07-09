@@ -389,6 +389,7 @@
         done();
     });
   };
+  global.resembleCanvas = resembleCanvas;
 
   function expectResembleCanvas(map, referenceImage, tolerance, done) {
     map.render();
