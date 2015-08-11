@@ -134,7 +134,7 @@ ol.reproj.Tile = function(sourceProj, sourceTileGrid,
     return;
   }
 
-  var targetCenter = ol.extent.getCenter(targetExtent);
+  var targetCenter = ol.extent.getCenter(limitedTargetExtent);
   var sourceResolution = ol.reproj.calculateSourceResolution(
       sourceProj, targetProj, targetCenter, targetResolution);
 

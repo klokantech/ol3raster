@@ -2,8 +2,6 @@ goog.provide('ol.reproj.Triangulation');
 
 goog.require('goog.array');
 goog.require('goog.math');
-goog.require('ol.coordinate');
-goog.require('ol.ext.earcut');
 goog.require('ol.extent');
 goog.require('ol.proj');
 
@@ -40,12 +38,6 @@ ol.reproj.Triangulation = function(sourceProj, targetProj, targetExtent,
    * @private
    */
   this.targetProj_ = targetProj;
-
-  /**
-   * @type {ol.TransformFunction}
-   * @private
-   */
-  this.transformFwd_ = ol.proj.getTransform(this.sourceProj_, this.targetProj_);
 
   /**
    * @type {ol.TransformFunction}
@@ -104,65 +96,6 @@ ol.reproj.Triangulation = function(sourceProj, targetProj, targetExtent,
   this.addQuadIfValid_(tlDst, trDst, brDst, blDst,
                        tlDstSrc, trDstSrc, brDstSrc, blDstSrc,
                        ol.RASTER_REPROJ_MAX_SUBDIVISION);
-};
-
-
-/**
- * Calculates intersection of quad (`a`,`b`,`c`,`d`) and `extent`.
- * Uses Sutherland-Hodgman algorithm for intersection calculation.
- * Triangulates the polygon if necessary.
- *
- * @param {ol.Coordinate} a
- * @param {ol.Coordinate} b
- * @param {ol.Coordinate} c
- * @param {ol.Coordinate} d
- * @param {ol.Extent} extent
- * @return {Array.<ol.Coordinate>} Raw triangles (flat array)
- * @private
- */
-ol.reproj.Triangulation.triangulateQuadExtentIntersection_ = function(
-    a, b, c, d, extent) {
-  var tl = ol.extent.getTopLeft(extent);
-  var tr = ol.extent.getTopRight(extent);
-  var bl = ol.extent.getBottomLeft(extent);
-  var br = ol.extent.getBottomRight(extent);
-  var edges = [[tl, tr], [tr, br], [br, bl], [bl, tl]];
-  var vertices = [a, b, c, d];
-
-  var isInside = function(a, b, p) {
-    return ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) <= 0;
-  };
-
-  goog.array.forEach(edges, function(edge, i, arr) {
-    var newVertices = [];
-    var S = vertices[vertices.length - 1];
-    goog.array.forEach(vertices, function(E, i, arr) {
-      if (isInside(edge[0], edge[1], E)) {
-        if (!isInside(edge[0], edge[1], S)) {
-          newVertices.push(ol.coordinate.getLineIntersection([S, E], edge));
-        }
-        newVertices.push(E);
-      } else if (isInside(edge[0], edge[1], S)) {
-        newVertices.push(ol.coordinate.getLineIntersection([S, E], edge));
-      }
-      S = E;
-    });
-    vertices = newVertices;
-  });
-
-  if (vertices.length < 3) {
-    // less than 3 (usually 0) -> no valid triangle left
-    return [];
-  } else if (vertices.length == 3) {
-    return vertices;
-  } else if (vertices.length == 4) {
-    // most common case -- don't use earcut for this
-    return [vertices[0], vertices[1], vertices[2],
-            vertices[0], vertices[2], vertices[3]];
-  } else {
-    // triangulate the result
-    return ol.ext.earcut([vertices], false);
-  }
 };
 
 
@@ -265,41 +198,6 @@ ol.reproj.Triangulation.prototype.addQuadIfValid_ = function(a, b, c, d,
     this.wrapsXInSource_ = true;
   }
 
-  if (goog.isDefAndNotNull(this.maxSourceExtent_)) {
-    if (!ol.extent.containsCoordinate(this.maxSourceExtent_, aSrc) ||
-        !ol.extent.containsCoordinate(this.maxSourceExtent_, bSrc) ||
-        !ol.extent.containsCoordinate(this.maxSourceExtent_, cSrc) ||
-        !ol.extent.containsCoordinate(this.maxSourceExtent_, dSrc)) {
-      // if any vertex is outside projection range, modify the target quad
-
-      var makeFinite = function(coord, extent) {
-        if (!goog.math.isFiniteNumber(coord[0])) {
-          coord[0] = goog.math.clamp(coord[0], extent[0], extent[2]);
-        }
-        if (!goog.math.isFiniteNumber(coord[1])) {
-          coord[1] = goog.math.clamp(coord[1], extent[1], extent[3]);
-        }
-      };
-      makeFinite(aSrc, this.maxSourceExtent_);
-      makeFinite(bSrc, this.maxSourceExtent_);
-      makeFinite(cSrc, this.maxSourceExtent_);
-      makeFinite(dSrc, this.maxSourceExtent_);
-
-      var tris = ol.reproj.Triangulation.triangulateQuadExtentIntersection_(
-          aSrc, bSrc, cSrc, dSrc, this.maxSourceExtent_);
-      var triCount = Math.floor(tris.length / 3);
-      for (var i = 0; i < triCount; i++) {
-        var aSrc_ = tris[3 * i],
-            bSrc_ = tris[3 * i + 1],
-            cSrc_ = tris[3 * i + 2];
-        var a_ = this.transformFwd_(aSrc_),
-            b_ = this.transformFwd_(bSrc_),
-            c_ = this.transformFwd_(cSrc_);
-        this.addTriangle_(a_, b_, c_, aSrc_, bSrc_, cSrc_);
-      }
-      return;
-    }
-  }
   this.addTriangle_(a, c, d, aSrc, cSrc, dSrc);
   this.addTriangle_(a, b, c, aSrc, bSrc, cSrc);
 };

@@ -104,6 +104,18 @@ ol.reproj.renderTriangles = function(context,
       ol.extent.extend(srcDataExtent, src.extent);
     }
   });
+  if (!goog.isNull(sourceExtent)) {
+    if (wrapXType == ol.reproj.WrapXRendering_.NONE) {
+      srcDataExtent[0] = goog.math.clamp(
+          srcDataExtent[0], sourceExtent[0], sourceExtent[2]);
+      srcDataExtent[2] = goog.math.clamp(
+          srcDataExtent[2], sourceExtent[0], sourceExtent[2]);
+    }
+    srcDataExtent[1] = goog.math.clamp(
+        srcDataExtent[1], sourceExtent[1], sourceExtent[3]);
+    srcDataExtent[3] = goog.math.clamp(
+        srcDataExtent[3], sourceExtent[1], sourceExtent[3]);
+  }
 
   var srcDataWidth = ol.extent.getWidth(srcDataExtent);
   var srcDataHeight = ol.extent.getHeight(srcDataExtent);
