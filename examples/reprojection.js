@@ -10,6 +10,7 @@ goog.require('ol.source.TileImage');
 goog.require('ol.source.TileWMS');
 goog.require('ol.source.WMTS');
 goog.require('ol.source.XYZ');
+goog.require('ol.tilegrid.TileGrid');
 
 
 proj4.defs('EPSG:27700', '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 ' +
@@ -122,6 +123,27 @@ layers['grandcanyon'] = new ol.layer.Tile({
       html: 'Tiles &copy; USGS, rendered with ' +
           '<a href="http://www.maptiler.com/">MapTiler</a>'
     })]
+  })
+});
+
+var startResolution =
+    ol.extent.getWidth(ol.proj.get('EPSG:3857').getExtent()) / 256;
+var resolutions = new Array(22);
+for (var i = 0, ii = resolutions.length; i < ii; ++i) {
+  resolutions[i] = startResolution / Math.pow(2, i);
+}
+
+layers['states'] = new ol.layer.Tile({
+  source: new ol.source.TileWMS({
+    url: 'http://demo.boundlessgeo.com/geoserver/wms',
+    params: {'LAYERS': 'topp:states', 'TILED': true},
+    serverType: 'geoserver',
+    tileGrid: new ol.tilegrid.TileGrid({
+      extent: [-13884991, 2870341, -7455066, 6338219],
+      resolutions: resolutions,
+      tileSize: [512, 256]
+    }),
+    projection: 'EPSG:3857'
   })
 });
 
