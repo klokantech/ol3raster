@@ -113,6 +113,17 @@ $.ajax('http://map1.vis.earthdata.nasa.gov/wmts-arctic/' +
   });
 });
 
+layers['grandcanyon'] = new ol.layer.Tile({
+  source: new ol.source.XYZ({
+    url: 'http://tileserver.maptiler.com/grandcanyon@2x/{z}/{x}/{y}.png',
+    tilePixelRatio: 2,
+    maxZoom: 15,
+    attributions: [new ol.Attribution({
+      html: 'Tiles &copy; USGS, rendered with ' +
+          '<a href="http://www.maptiler.com/">MapTiler</a>'
+    })]
+  })
+});
 
 
 var map = new ol.Map({
