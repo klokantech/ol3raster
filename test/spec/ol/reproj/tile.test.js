@@ -14,56 +14,81 @@ describe('ol.reproj.Tile', function() {
     delete proj4.defs['EPSG:27700'];
   });
 
-  describe('constructor', function() {
-    it('is empty when outside target tile grid', function() {
-      var proj4326 = ol.proj.get('EPSG:4326');
-      var proj3857 = ol.proj.get('EPSG:3857');
-      var tile = new ol.reproj.Tile(
-          proj3857, ol.tilegrid.createForProjection(proj3857),
-          proj4326, ol.tilegrid.createForProjection(proj4326),
-          0, -1, 0, 1, function() {
-            expect().fail('No tiles should be required');
-          });
-      expect(tile.getState()).to.be(ol.TileState.EMPTY);
-    });
 
-    it('is empty when outside source tile grid', function() {
-      var proj4326 = ol.proj.get('EPSG:4326');
-      var proj27700 = ol.proj.get('EPSG:27700');
-      var tile = new ol.reproj.Tile(
-          proj27700, ol.tilegrid.createForProjection(proj27700),
-          proj4326, ol.tilegrid.createForProjection(proj4326),
-          3, 2, -2, 1, function() {
-            expect().fail('No tiles should be required');
-          });
-      expect(tile.getState()).to.be(ol.TileState.EMPTY);
-    });
+  function createTile(pixelRatio, opt_tileSize) {
+    var proj4326 = ol.proj.get('EPSG:4326');
+    var proj3857 = ol.proj.get('EPSG:3857');
+    return new ol.reproj.Tile(
+        proj3857, ol.tilegrid.createForProjection(proj3857), proj4326,
+        ol.tilegrid.createForProjection(proj4326, 3, opt_tileSize),
+        3, 2, -2, pixelRatio, function(z, x, y, pixelRatio) {
+          return new ol.ImageTile([z, x, y], ol.TileState.IDLE,
+              'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=', '',
+              function(tile, src) {
+                tile.getImage().src = src;
+              });
+        });
+  }
 
-    it('respects tile size of target tile grid', function(done) {
-      var proj4326 = ol.proj.get('EPSG:4326');
-      var proj3857 = ol.proj.get('EPSG:3857');
-      var tile = new ol.reproj.Tile(
-          proj3857, ol.tilegrid.createForProjection(proj3857),
-          proj4326, ol.tilegrid.createForProjection(proj4326, 10, [100, 40]),
-          3, 2, -2, 1, function(z, x, y, pixelRatio) {
-            return new ol.ImageTile([z, x, y], ol.TileState.IDLE,
-                'spec/ol/source/images/12-655-1583.png', '',
-                function(tile, src) {
-                  tile.getImage().src = src;
-                });
-          });
-      expect(tile.getState()).to.be(ol.TileState.IDLE);
-      tile.listen('change', function() {
-        //expect(tile.getState()).to.be(ol.TileState.LOADING);
-        if (tile.getState() == ol.TileState.LOADED) {
-          var canvas = tile.getImage();
-          expect(canvas.width).to.be(100);
-          expect(canvas.height).to.be(40);
-          done();
-        }
-      });
-      tile.load();
+  it('changes state as expected', function(done) {
+    var tile = createTile(1);
+    expect(tile.getState()).to.be(ol.TileState.IDLE);
+    tile.listen('change', function() {
+      if (tile.getState() == ol.TileState.LOADED) {
+        done();
+      }
     });
+    tile.load();
+  });
+
+  it('is empty when outside target tile grid', function() {
+    var proj4326 = ol.proj.get('EPSG:4326');
+    var proj3857 = ol.proj.get('EPSG:3857');
+    var tile = new ol.reproj.Tile(
+        proj3857, ol.tilegrid.createForProjection(proj3857),
+        proj4326, ol.tilegrid.createForProjection(proj4326),
+        0, -1, 0, 1, function() {
+          expect().fail('No tiles should be required');
+        });
+    expect(tile.getState()).to.be(ol.TileState.EMPTY);
+  });
+
+  it('is empty when outside source tile grid', function() {
+    var proj4326 = ol.proj.get('EPSG:4326');
+    var proj27700 = ol.proj.get('EPSG:27700');
+    var tile = new ol.reproj.Tile(
+        proj27700, ol.tilegrid.createForProjection(proj27700),
+        proj4326, ol.tilegrid.createForProjection(proj4326),
+        3, 2, -2, 1, function() {
+          expect().fail('No tiles should be required');
+        });
+    expect(tile.getState()).to.be(ol.TileState.EMPTY);
+  });
+
+  it('respects tile size of target tile grid', function(done) {
+    var tile = createTile(1, [100, 40]);
+    tile.listen('change', function() {
+      if (tile.getState() == ol.TileState.LOADED) {
+        var canvas = tile.getImage();
+        expect(canvas.width).to.be(100);
+        expect(canvas.height).to.be(40);
+        done();
+      }
+    });
+    tile.load();
+  });
+
+  it('respects pixelRatio', function(done) {
+    var tile = createTile(3, [60, 20]);
+    tile.listen('change', function() {
+      if (tile.getState() == ol.TileState.LOADED) {
+        var canvas = tile.getImage();
+        expect(canvas.width).to.be(180);
+        expect(canvas.height).to.be(60);
+        done();
+      }
+    });
+    tile.load();
   });
 });
 
