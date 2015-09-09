@@ -3832,7 +3832,8 @@ olx.source.BingMapsOptions.prototype.maxZoom;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -4018,7 +4019,8 @@ olx.source.TileImageOptions.prototype.projection;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -4299,7 +4301,8 @@ olx.source.MapQuestOptions.prototype.layer;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -4399,7 +4402,8 @@ olx.source.OSMOptions.prototype.maxZoom;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -4803,7 +4807,8 @@ olx.source.StamenOptions.prototype.opaque;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -4989,7 +4994,8 @@ olx.source.TileArcGISRestOptions.prototype.projection;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -5065,7 +5071,8 @@ olx.source.TileJSONOptions.prototype.crossOrigin;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -5208,7 +5215,8 @@ olx.source.TileWMSOptions.prototype.projection;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -5447,7 +5455,8 @@ olx.source.WMTSOptions.prototype.projection;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -5633,7 +5642,8 @@ olx.source.XYZOptions.prototype.projection;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
@@ -5768,7 +5778,8 @@ olx.source.ZoomifyOptions.prototype.logo;
 
 
 /**
- * Maximum allowed reprojection error.
+ * Maximum allowed reprojection error (in pixels). Default is `0.5`.
+ * Higher values can increase reprojection performance, but decrease precision.
  * @type {number|undefined}
  * @api
  */
