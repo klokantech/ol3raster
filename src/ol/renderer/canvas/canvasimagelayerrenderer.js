@@ -8,6 +8,7 @@ goog.require('ol.ViewHint');
 goog.require('ol.dom');
 goog.require('ol.extent');
 goog.require('ol.layer.Image');
+goog.require('ol.proj');
 goog.require('ol.renderer.canvas.Layer');
 goog.require('ol.source.ImageVector');
 goog.require('ol.vec.Mat4');
@@ -170,6 +171,14 @@ ol.renderer.canvas.ImageLayer.prototype.prepareFrame =
   if (!hints[ol.ViewHint.ANIMATING] && !hints[ol.ViewHint.INTERACTING] &&
       !ol.extent.isEmpty(renderedExtent)) {
     var projection = viewState.projection;
+    if (!ol.ENABLE_RASTER_REPROJECTION) {
+      var sourceProjection = imageSource.getProjection();
+      if (!goog.isNull(sourceProjection)) {
+        goog.asserts.assert(ol.proj.equivalent(projection, sourceProjection),
+            'projection and sourceProjection are equivalent');
+        projection = sourceProjection;
+      }
+    }
     image = imageSource.getImage(
         renderedExtent, viewResolution, pixelRatio, projection);
     if (!goog.isNull(image)) {
