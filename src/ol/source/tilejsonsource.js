@@ -34,6 +34,7 @@ ol.source.TileJSON = function(options) {
     attributions: options.attributions,
     crossOrigin: options.crossOrigin,
     projection: ol.proj.get('EPSG:3857'),
+    reprojectionErrorThreshold: options.reprojectionErrorThreshold,
     state: ol.source.State.LOADING,
     tileLoadFunction: options.tileLoadFunction,
     wrapX: goog.isDef(options.wrapX) ? options.wrapX : true

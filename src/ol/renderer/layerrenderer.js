@@ -86,6 +86,7 @@ ol.renderer.Layer.prototype.hasFeatureAtCoordinate = goog.functions.FALSE;
 /**
  * Create a function that adds loaded tiles to the tile lookup.
  * @param {ol.source.Tile} source Tile source.
+ * @param {ol.proj.Projection} projection Projection of the tiles.
  * @param {Object.<number, Object.<string, ol.Tile>>} tiles Lookup of loaded
  *     tiles by zoom level.
  * @return {function(number, ol.TileRange):boolean} A function that can be
@@ -93,7 +94,8 @@ ol.renderer.Layer.prototype.hasFeatureAtCoordinate = goog.functions.FALSE;
  *     lookup.
  * @protected
  */
-ol.renderer.Layer.prototype.createLoadedTileFinder = function(source, tiles) {
+ol.renderer.Layer.prototype.createLoadedTileFinder =
+    function(source, projection, tiles) {
   return (
       /**
        * @param {number} zoom Zoom level.
@@ -101,12 +103,13 @@ ol.renderer.Layer.prototype.createLoadedTileFinder = function(source, tiles) {
        * @return {boolean} The tile range is fully loaded.
        */
       function(zoom, tileRange) {
-        return source.forEachLoadedTile(zoom, tileRange, function(tile) {
-          if (!tiles[zoom]) {
-            tiles[zoom] = {};
-          }
-          tiles[zoom][tile.tileCoord.toString()] = tile;
-        });
+        return source.forEachLoadedTile(projection, zoom,
+                                        tileRange, function(tile) {
+              if (!tiles[zoom]) {
+                tiles[zoom] = {};
+              }
+              tiles[zoom][tile.tileCoord.toString()] = tile;
+            });
       });
 };
 
@@ -155,8 +158,9 @@ ol.renderer.Layer.prototype.loadImage = function(image) {
   if (imageState == ol.ImageState.IDLE) {
     image.load();
     imageState = image.getState();
-    goog.asserts.assert(imageState == ol.ImageState.LOADING,
-        'imageState is "loading"');
+    goog.asserts.assert(imageState == ol.ImageState.LOADING ||
+        imageState == ol.ImageState.LOADED,
+        'imageState is "loading" or "loaded"');
   }
   return imageState == ol.ImageState.LOADED;
 };
@@ -190,7 +194,8 @@ ol.renderer.Layer.prototype.scheduleExpireCache =
              */
             function(tileSource, map, frameState) {
               var tileSourceKey = goog.getUid(tileSource).toString();
-              tileSource.expireCache(frameState.usedTiles[tileSourceKey]);
+              tileSource.expireCache(frameState.viewState.projection,
+                                     frameState.usedTiles[tileSourceKey]);
             }, tileSource));
   }
 };
@@ -323,7 +328,7 @@ ol.renderer.Layer.prototype.manageTilePyramid = function(
             opt_tileCallback.call(opt_this, tile);
           }
         } else {
-          tileSource.useTile(z, x, y);
+          tileSource.useTile(z, x, y, projection);
         }
       }
     }
